@@ -4,7 +4,7 @@ Atividade da disciplina **Tópicos Especiais em Engenharia Elétrica IV** — UF
 
 O projeto compara dois métodos de SLAM (**Hector SLAM** e **Gmapping**) na geração de mapas do ambiente simulado do LaR, seguido de localização com **AMCL** sobre cada mapa, comparando a pose estimada com o *ground truth* fornecido pelo Gazebo (`/gazebo/model_states`).
 
-> Este repositório usa como base o pacote ROS [`lar_gazebo`](https://github.com/lar-deeufba/lar_gazebo) do laboratório LaR/UFBA (ambiente simulado, modelos, mundo, integração com Husky), sobre o qual foram adicionados os arquivos específicos desta atividade: `launch/amcl.launch`, `scripts/captura_poses.py`, `scripts/calcular_metricas.py`, os mapas gerados e os resultados.
+Este repositório usa como base o pacote ROS [`lar_gazebo`](https://github.com/lar-deeufba/lar_gazebo) do laboratório LaR/UFBA (ambiente simulado, modelos, mundo, integração com Husky). Sobre essa base foram adicionados os arquivos desta atividade: `launch/amcl.launch`, `scripts/captura_poses.py`, `scripts/calcular_metricas.py`, os mapas gerados e os resultados.
 
 ## Ambiente
 
@@ -41,7 +41,7 @@ docker/
   entrypoint.sh
 ```
 
-> Os demais diretórios (`models/`, `worlds/`, `maps/lab_robotica_06mai2019.*`, `april_tags/`, `husky_urdf_extras/`, `husky_accessories.sh`, `config/hector_slam.rviz`) pertencem ao pacote base do laboratório e são necessários para o `catkin build`/`roslaunch` funcionarem; não foram alterados nesta atividade.
+Os demais diretórios (`models/`, `worlds/`, `maps/lab_robotica_06mai2019.*`, `april_tags/`, `husky_urdf_extras/`, `husky_accessories.sh`, `config/hector_slam.rviz`) pertencem ao pacote base do laboratório, necessários para o `catkin build`/`roslaunch` funcionarem. Não foram alterados nesta atividade.
 
 ## Como executar
 
@@ -57,7 +57,7 @@ docker compose build
 ./scripts/run_husky.sh gui:=false
 ```
 
-> A GUI 3D do Gazebo é mantida desligada por padrão: em testes, ela causou sobrecarga de CPU (>400%) suficiente para introduzir uma defasagem real de ~8s entre o timestamp do `/front/scan` e o `/clock` simulado, esgotando o buffer fixo do `tf::MessageFilter` usado pelo `slam_gmapping` e travando a publicação do `/map` (ver discussão abaixo). Use o RViz para navegação visual em vez da GUI do Gazebo.
+A GUI 3D do Gazebo fica desligada por padrão. Em testes, ela causou sobrecarga de CPU (>400%) suficiente para introduzir uma defasagem real de ~8s entre o timestamp do `/front/scan` e o `/clock` simulado, esgotando o buffer fixo do `tf::MessageFilter` usado pelo `slam_gmapping` e travando a publicação do `/map` (detalhes na seção de Discussão). Use o RViz para navegação visual em vez da GUI do Gazebo.
 
 ### 3. Gerar os mapas
 
@@ -82,7 +82,7 @@ rosrun map_server map_saver -f /ws/src/lar_gazebo/maps/mapa_gmapping
 rosrun map_server map_saver -f /ws/src/lar_gazebo/maps/mapa_hector
 ```
 
-> **Sobre o comando de teleoperação:** use sempre `cmd_vel:=/kb_teleop/cmd_vel`, nunca `/husky_velocity_controller/cmd_vel` diretamente. O nó `/twist_mux` arbitra entre múltiplas fontes (teclado, joystick) e só ele publica na saída final do Husky; publicar direto na saída cria dois publishers concorrentes e o comando de teclado é "engolido" pelo mux, fazendo o robô parecer não responder mesmo sem erros nos logs.
+Sobre o comando de teleoperação: use sempre `cmd_vel:=/kb_teleop/cmd_vel`, nunca `/husky_velocity_controller/cmd_vel` diretamente. O nó `/twist_mux` arbitra entre múltiplas fontes (teclado, joystick) e só ele publica na saída final do Husky. Publicar direto na saída cria dois publishers concorrentes no mesmo tópico, e o teclado simplesmente perde — o robô parece não responder mesmo sem nenhum erro nos logs.
 
 ### 4. Rodar o AMCL e capturar dados
 
@@ -91,9 +91,9 @@ Para cada mapa:
 roslaunch lar_gazebo amcl.launch map_file:=/ws/src/lar_gazebo/maps/mapa_hector.yaml
 ```
 
-No RViz, usar **2D Pose Estimate** (gesto de clique-arrastar-soltar, não um clique simples) para indicar a pose inicial real do robô.
+No RViz, usar **2D Pose Estimate** (clique-arrastar-soltar, não um clique simples) para indicar a pose inicial real do robô.
 
-**Passo crítico — confirmar a calibração antes de capturar dados:**
+Antes de capturar os dados, vale confirmar a calibração:
 ```bash
 # pose real do robô no mundo (ground truth) -- ANTES do Pose Estimate
 rostopic echo /gazebo/model_states -n 1
@@ -102,7 +102,7 @@ Anote `x`, `y` do modelo `husky`. Depois do Pose Estimate, confirme que a pose d
 ```bash
 rostopic echo /amcl_pose -n 1
 ```
-A diferença deve ser de poucos centímetros. Se for da ordem de **metros**, refaça o Pose Estimate antes de capturar — ver nota na seção de Limitações abaixo sobre o que aconteceu quando esse passo não foi seguido nesta execução.
+A diferença deve ser de poucos centímetros. Se for da ordem de metros, o Pose Estimate foi feito no ponto errado do mapa — refaça antes de capturar. Foi exatamente isso que aconteceu nesta execução (ver Limitações).
 
 Capturando:
 ```bash
@@ -110,9 +110,9 @@ python3 scripts/captura_poses.py mapa_hector
 # teleoperar cobrindo o ambiente; Ctrl+C na captura ao terminar
 ```
 
-Repetir substituindo por `mapa_gmapping` (refazendo o 2D Pose Estimate — a pose anterior não é válida para o novo mapa).
+Repetir substituindo por `mapa_gmapping`, refazendo o 2D Pose Estimate (a pose anterior não vale para o novo mapa).
 
-**Validação do CSV antes de aceitar os dados como bons:** o critério correto **não** é o percentual de linhas repetidas no total do arquivo — uma taxa de repetição de ~99% é esperada e normal, já que o ground truth (`/gazebo/model_states`) publica a ~100Hz enquanto o AMCL atualiza a ~0.9Hz (dado `update_min_d=0.2`, `update_min_a=0.2`). O critério que importa é a **maior sequência contínua de repetição em segundos**: valores na faixa de 1–4s são saudáveis; sequências de 10s ou mais indicam robô parado por erro operacional durante aquele trecho.
+Para validar o CSV antes de aceitar os dados, o critério correto não é o percentual de linhas repetidas no arquivo todo — uma taxa de ~99% é esperada e normal, já que o ground truth (`/gazebo/model_states`) publica a ~100Hz enquanto o AMCL atualiza a ~0.9Hz (dado `update_min_d=0.2`, `update_min_a=0.2`). O que importa é a maior sequência contínua de repetição em segundos: valores na faixa de 1–4s são saudáveis, sequências de 10s ou mais indicam robô parado por algum problema operacional naquele trecho.
 
 ### 5. Calcular métricas
 
@@ -126,7 +126,7 @@ Gera no terminal as métricas de cada execução e a comparação direta, além 
 
 ## Metodologia — nota sobre `poses_mapa_hector.csv`
 
-A captura original do Hector (`poses_mapa_hector_original.csv`, preservada no repositório para auditoria) apresentava dois trechos longos de robô parado por interrupção operacional (não relacionados ao AMCL ou ao SLAM): ~25s no início e ~15s no fim, juntos representando uma fração relevante do arquivo. O arquivo `poses_mapa_hector.csv` usado nas métricas finais é uma versão recortada para o intervalo de tempo em que o robô estava efetivamente em movimento contínuo.
+A captura original do Hector (`poses_mapa_hector_original.csv`, preservada no repositório para auditoria) tinha dois trechos longos de robô parado por interrupção operacional, sem relação com AMCL ou SLAM: ~25s no início e ~15s no fim, somando boa parte do arquivo. O `poses_mapa_hector.csv` usado nas métricas finais é a versão recortada para o intervalo em que o robô estava de fato em movimento contínuo.
 
 ## Resultados
 
@@ -140,42 +140,40 @@ A captura original do Hector (`poses_mapa_hector_original.csv`, preservada no re
 
 ![Erro ao longo do tempo](resultados/erro_ao_longo_do_tempo.png)
 
-> **Sobre o RMSE acima:** os valores de RMSE reportados estão inflados por um offset sistemático de calibração inicial do AMCL e **não representam a precisão real de localização** dos dois métodos. Ver a seção de Limitações abaixo para a explicação completa e a justificativa de por que o desvio padrão foi adotado como métrica primária de comparação.
+Os valores de RMSE acima estão distorcidos por um offset de calibração inicial do AMCL e não representam a precisão real de localização dos dois métodos (explicação completa na seção de Limitações). Por isso o desvio padrão foi usado como métrica principal de comparação.
 
 ### Análise qualitativa dos mapas
 
 | Critério | Hector SLAM | Gmapping |
 |---|---|---|
-| Completude | Perímetro externo bem definido, cantos retos, corredor inferior bem delimitado | Contorno fechado, cantos bem definidos após exploração mais longa e cuidadosa |
-| Distorções | Mínimas; estrutura geral fiel ao ambiente | Sem o artefato de "leque" grande presente em tentativas iniciais de exploração mais curta |
-| Paredes desalinhadas | Não observadas de forma significativa | Não observadas de forma significativa na versão final |
-| Obstáculos falsos | Obstáculos centrais (mesas) com bordas nítidas, sem ruído espúrio relevante | Bordas dos obstáculos centrais ligeiramente mais difusas que no Hector |
-| Regiões desconhecidas | Pequeno artefato de incerteza próximo a uma abertura, extensão limitada | Dependente diretamente da cobertura da exploração; melhorou bastante com navegação mais longa e orientada |
-| Qualidade da localização (AMCL) | Maior estabilidade: desvio padrão do erro ~4,8x menor que o Gmapping | Maior variabilidade na estimativa de pose ao longo da trajetória |
+| Completude | Perímetro exterior bem definido, cantos retos e o corredor apresentando limitações | Contorno fechado, cantos bem definidos após uma exploração mais longa e detalhada |
+| Distorções | Mínimas; estrutura geral apresentou fidelidade ao ambiente analisado | Sem o artefato de "leque" grande presente em tentativas iniciais em que a exploração foi mais curta |
+| Paredes desalinhadas | Não observadas de uma maneira tão significativa | Não observadas ao "pé da letra" na versão final |
+| Obstáculos falsos | Obstáculos centrais (mesas) com bordas apresentando nitidez, sem a presença de ruído espúrio relevante | Bordas dos obstáculos centrais com uma difusão ligeiramente mais visível que no Hector |
+| Regiões desconhecidas | Pequeno artefato de incerteza próximo a uma abertura, em que tem-se extensão limitada | Dependência diretamente da cobertura da exploração; melhorou significativamente com navegação mais longa e também orientada |
+| Qualidade da localização (AMCL) | Maior estabilidade: desvio padrão do erro em torno de ~4,8x menor que o Gmapping | Maior variabilidade na estimativa de pose ao longo da trajetória |
 
 ## Discussão
 
-### Qual método produziu o melhor mapa?
+### Melhor mapa
 
-O **Hector SLAM** produziu o mapa mais completo e com menos artefatos visuais, mesmo após o Gmapping ter sido regenerado com exploração mais longa e cuidadosa (ativando o display `Map` no RViz desde o início para guiar a cobertura). O Hector se beneficia de não depender de uma cadeia de TF sincronizada para o scan matching — ele casa o laser diretamente contra o mapa em construção — o que também explica sua maior robustez observada durante a fase de geração do mapa (ver observação técnica abaixo).
+O Hector SLAM produziu o mapa mais completo e com menos artefatos visuais, mesmo depois do Gmapping ter sido regenerado com exploração mais longa e cuidadosa (display `Map` ativo no RViz desde o início, pra guiar a cobertura). O Hector não depende de uma cadeia de TF sincronizada para o scan matching — ele casa o laser direto contra o mapa em construção. Isso também explica a maior consistência dele durante a geração do mapa.
 
-### Qual mapa permitiu melhor localização com AMCL?
+### Melhor localização
 
-Aqui é necessário separar dois aspectos: **magnitude absoluta do erro** e **estabilidade da estimativa**.
+O RMSE e a estabilidade apresentam uma seguinte discussão: O RMSE de posição (5,74 m para Hector, 6,22 m para Gmapping) e o erro de posição final não devem ser lidos como a precisão real da localização, levado ao fato de que estão distorcidos por um offset de calibração identificado durante a execução. Assim, a comparação usa o desvio padrão do erro de posição, sendo responsável por medir a variabilidade em torno da própria referência da trajetória, e, não é afetado por um offset constante somado a todas as amostras.
 
-Os valores de RMSE de posição (5,74 m para Hector, 6,22 m para Gmapping) e erro de posição final, conforme calculados, **não devem ser interpretados como a precisão real da localização** — eles estão inflados por um offset sistemático de calibração, identificado durante a execução (ver Limitações). Por isso, a métrica adotada como base de comparação é o **desvio padrão do erro de posição**, que mede variabilidade em torno da própria referência da trajetória e não é afetada por um offset constante somado a todas as amostras.
+Em função disso, o Hector permitiu localização bem mais estável: desvio padrão de 0,23 m contra 1,11 m do Gmapping, quase 5 vezes menor. O erro de orientação médio segue a mesma tendência (6,04° vs. 7,64°). Provavelmente o mapa do Hector forneceu uma estrutura mais consistente para o *likelihood field* do AMCL se ancorar a cada atualização, resultando em menor variância na pose estimada. Pode ter relação também com a diferença de área de varredura entre os dois mapas: `mapa_gmapping.yaml` tem origem `[-50.0, -50.0]` e cobre uma área bem maior que `mapa_hector.yaml`, origem `[-6.425, -6.425]`.
 
-Por esse critério, o **Hector SLAM permitiu localização substancialmente mais estável**: desvio padrão de 0,23 m contra 1,11 m do Gmapping — uma diferença de aproximadamente 4,8 vezes. O erro de orientação médio segue a mesma tendência (6,04° vs. 7,64°). A interpretação mais provável é que o mapa gerado pelo Hector ofereceu uma estrutura mais consistente para o algoritmo de *likelihood field* do AMCL se ancorar a cada atualização, resultando em estimativas de pose com menor variância — possivelmente relacionado também à diferença de área de varredura entre os dois mapas (`mapa_gmapping.yaml` tem origem `[-50.0, -50.0]` e cobre uma área bem maior que `mapa_hector.yaml`, origem `[-6.425, -6.425]`).
+### Acerca da sobrecarga computacional
 
-### Observação técnica relevante: robustez do Hector vs. Gmapping frente a sobrecarga computacional
-
-Durante a fase de geração de mapas, o `gmapping` apresentou falha de publicação do tópico `/map` causada por sobrecarga de CPU da GUI 3D do Gazebo, que introduzia atraso real (~8s) entre o timestamp do `/front/scan` e o `/clock` simulado — suficiente para esgotar o buffer fixo (5 mensagens) do `tf::MessageFilter` usado internamente pelo `slam_gmapping`. O Hector SLAM não apresentou esse problema por não depender de TF sincronizada para o scan matching. Essa diferença de robustez frente a atraso/sobrecarga computacional é uma observação relevante para a comparação entre os dois algoritmos, independente da qualidade final dos mapas obtidos.
+Durante a geração de mapas, o gmapping apresentou falha de publicação do `/map` causada por sobrecarga de CPU da GUI 3D do Gazebo. Essa sobrecarga introduzia um atraso real de ~8s entre o timestamp do `/front/scan` e o `/clock` simulado, suficiente para esgotar o buffer fixo (5 mensagens) do `tf::MessageFilter` usado internamente pelo `slam_gmapping`. O Hector não apresentou esse problema por não depender de TF sincronizada para o scan matching. Essa diferença de confiabilidade frente a atraso/sobrecarga computacional é relevante para a comparação entre os dois algoritmos, independente da qualidade final dos mapas.
 
 ## Limitações conhecidas
 
-**Offset sistemático de calibração do AMCL.** O "2D Pose Estimate" inicial foi posicionado, em ambas as execuções, em um ponto do mapa que não corresponde exatamente à posição real do robô no Gazebo. A evidência de que se trata de offset de calibração — e não de erro real de localização ou *drift* — é que a diferença entre a pose estimada pelo AMCL e o ground truth permanece **aproximadamente constante** ao longo de toda a trajetória, em vez de crescer com o tempo. Isso indica que o filtro de partículas convergiu e manteve-se estável em torno de uma referência inicial deslocada, não que a localização tenha falhado.
+O "2D Pose Estimate" inicial foi posicionado, nas duas execuções, em um ponto do mapa que não corresponde exatamente à posição real do robô no Gazebo. A diferença entre a pose estimada pelo AMCL e o ground truth fica praticamente constante do começo ao fim da trajetória, em vez de crescer com o tempo — o que indica offset de calibração, não drift. O filtro de partículas convergiu normalmente e se manteve estável, mas em torno de uma referência inicial deslocada.
 
-Esse tipo de erro não gera nenhum aviso ou falha visível nos logs do ROS — o AMCL converge normalmente e aparenta estar saudável, apenas com a referência inteira deslocada. Por esse motivo, qualquer relatório que apresente RMSE de posição na faixa de metros (em vez de centímetros) deve ser investigado quanto à calibração do Pose Estimate antes de aceitar os números como representativos da qualidade real da localização — foi exatamente esse o sintoma observado aqui.
+Esse tipo de erro não gera nenhum aviso nos logs do ROS — o AMCL converge normalmente e parece saudável, só que com a referência inteira deslocada. Por isso, qualquer RMSE de posição na faixa de metros mostra a necessidade de verificar a calibração do Pose Estimate antes de aceitar os números como representativos da localização real, exatamente a questão observada.
 
 ## Autor
 
