@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# ROS / catkin (caso o repo seja usado como workspace completo)
+devel/
+build/
+logs/
+.catkin_workspace
+
+# Imagens convertidas localmente a partir dos .pgm para visualização
+*.png.bak
+
+# Configurações pessoais de RViz não destinadas ao repositório
+config/oi.rviz
+
+# Editor / SO
+.vscode/
+.idea/
+*.swp
+.DS_Store

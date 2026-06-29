@@ -1,0 +1,52 @@
+<launch>
+  <!--
+    Uso:
+      roslaunch lar_gazebo amcl.launch map_file:=/ws/src/lar_gazebo/maps/mapa_hector.yaml
+      roslaunch lar_gazebo amcl.launch map_file:=/ws/src/lar_gazebo/maps/mapa_gmapping.yaml
+
+    map_file e OBRIGATORIO, sem default de proposito, para evitar rodar
+    AMCL acidentalmente sobre o mapa errado.
+  -->
+  <arg name="map_file" />
+
+  <!-- map_server: publica o mapa estatico escolhido em /map -->
+  <node pkg="map_server" type="map_server" name="map_server" args="$(arg map_file)" />
+
+  <!-- AMCL: parametros pensados para o Husky (laser frontal, base diferencial) -->
+  <node pkg="amcl" type="amcl" name="amcl" output="screen">
+    <remap from="scan" to="/front/scan"/>
+
+    <param name="odom_frame_id"  value="odom"/>
+    <param name="base_frame_id"  value="base_link"/>
+    <param name="global_frame_id" value="map"/>
+
+    <!-- modelo de odometria diff drive (Husky) -->
+    <param name="odom_model_type" value="diff"/>
+
+    <!-- nuvem de particulas -->
+    <param name="min_particles" value="200"/>
+    <param name="max_particles" value="2000"/>
+
+    <!-- ruido do modelo de movimento, valores padrao conservadores -->
+    <param name="odom_alpha1" value="0.2"/>
+    <param name="odom_alpha2" value="0.2"/>
+    <param name="odom_alpha3" value="0.2"/>
+    <param name="odom_alpha4" value="0.2"/>
+
+    <!-- modelo do laser -->
+    <param name="laser_model_type" value="likelihood_field"/>
+    <param name="laser_max_range" value="20.0"/>
+    <param name="laser_max_beams" value="60"/>
+
+    <!-- atualizacao: a cada cerca de 0.2m ou 0.2rad de movimento -->
+    <param name="update_min_d" value="0.2"/>
+    <param name="update_min_a" value="0.2"/>
+
+    <!-- pose inicial: ajuste para a pose de spawn real do Husky no .world -->
+    <param name="initial_pose_x" value="0.0"/>
+    <param name="initial_pose_y" value="0.0"/>
+    <param name="initial_pose_a" value="0.0"/>
+
+    <param name="transform_tolerance" value="0.2"/>
+  </node>
+</launch>
