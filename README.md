@@ -138,7 +138,7 @@ A captura original do Hector (`poses_mapa_hector_original.csv`, preservada no re
 | Desvio padrão do erro de posição (m) | 0,2300 | 1,1087 |
 | Erro de orientação médio (graus) | 6,04 | 7,64 |
 
-![Erro ao longo do tempo](resultados/erro_ao_longo_do_tempo.png)
+![Erro ao longo do tempo](lar_gazebo/resultados/erro_ao_longo_do_tempo.png)
 
 Os valores de RMSE acima estão distorcidos por um offset de calibração inicial do AMCL e não representam a precisão real de localização dos dois métodos (explicação completa na seção de Limitações). Por isso o desvio padrão foi usado como métrica principal de comparação.
 
