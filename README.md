@@ -144,6 +144,10 @@ Os valores de RMSE acima estão distorcidos por um offset de calibração inicia
 
 ### Análise qualitativa dos mapas
 
+| Hector SLAM | Gmapping |
+|---|---|
+| ![Mapa gerado do Hector SLAM](lar_gazebo/maps/mapa_hector.png) | ![Mapa gerado do Gmapping](lar_gazebo/maps/mapa_gmapping.png) |
+
 | Critério | Hector SLAM | Gmapping |
 |---|---|---|
 | Completude | Perímetro exterior bem definido, cantos retos e o corredor apresentando limitações | Contorno fechado, cantos bem definidos após uma exploração mais longa e detalhada |
